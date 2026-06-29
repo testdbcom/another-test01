@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ລະບົບບໍລິການລົດລາກສຸກເສີນ 24 ຊົ່ວໂມງ</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Phetsarath+OT&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Phetsarath OT', sans-serif;
+        }
+    </style>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-[#0B3C1D] text-white min-h-screen">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ==========================================
+        // 1. FIREBASE CONFIGURATION (ປ່ຽນເປັນຂອງຕົນເອງໄດ້)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "",
+            authDomain: "mock-tow-truck.firebaseapp.com",
+            projectId: "mock-tow-truck",
+            storageBucket: "mock-tow-truck.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abc123xyz"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const appId = 'tow-truck-app-lao';
+
+        // ຂໍ້ມູນເລີ່ມຕົ້ນ (Seed Data)
+        const INITIAL_TRUCKS = [
+            {
+                name: "ລົດລາກຂະໜາດນ້ອຍ (Small Tow Flatbed)",
+                type: "small",
+                price: 150000,
+                driverName: "ທ້າວ ສົມພອນ ສີວິໄລ",
+                driverPhone: "020 55443322",
+                suitability: "Ref: ໂຄງການ React - ເໝາະສຳລັບລົດເກັງ, ລົດຈັກ ແລະ ລົດ SUV ຂະໜາດນ້ອຍ",
+                imageUrl: "https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&q=80&w=600",
+                status: "ว่าง"
+            },
+            {
+                name: "ລົດຍົກຂະໜາດກາງ (Medium Wheel Lift)",
+                type: "medium",
+                price: 250000,
+                driverName: "ທ້າວ ບຸນມີ ແກ້ວມະນີ",
+                driverPhone: "020 99887766",
+                suitability: "Ref: ໂຄງການ React - ເໝາະສຳລັບລົດກະບະ (Pickup) ແລະ ລົດຕູ້ຂະໜາດກາງ",
+                imageUrl: "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&q=80&w=600",
+                status: "ว่าง"
+            },
+            {
+                name: "ເຄນຍົກຂະໜາດໃຫຍ່ (Heavy Duty Crane Truck)",
+                type: "heavy",
+                price: 500000,
+                driverName: "ທ້າວ ຄຳໄສ ສີປະເສີດ",
+                driverPhone: "020 22334455",
+                suitability: "Ref: ໂຄງການ React - ເໝາະສຳລັບລົດບັນທຸກ, ລົດເມ ແລະ ອຸປະຕິເຫດຮ້າຍແຮງທີ່ຕົກຮ່ອງ",
+                imageUrl: "https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&q=80&w=600",
+                status: "ว่าง"
+            }
+        ];
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [currentTab, setCurrentTab] = useState('customer');
+            const [adminLoggedIn, setAdminLoggedIn] = useState(false);
+            const [adminUsername, setAdminUsername] = useState('');
+            const [adminPassword, setAdminPassword] = useState('');
+            const [adminError, setAdminError] = useState('');
+            
+            const [trucks, setTrucks] = useState([]);
+            const [orders, setOrders] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            const [selectedTruck, setSelectedTruck] = useState(null);
+            const [customerName, setCustomerName] = useState('');
+            const [customerPhone, setCustomerPhone] = useState('');
+            const [carConditionImg, setCarConditionImg] = useState('');
+            const [damageDesc, setDamageDesc] = useState('');
+            const [gpsLocation, setGpsLocation] = useState({ lat: 17.9757, lng: 102.6331 });
+            const [detectingGps, setDetectingGps] = useState(false);
+            const [bookingStatus, setBookingStatus] = useState(null);
+            const [activeBookingId, setActiveBookingId] = useState(null);
+
+            const [isEditingTruck, setIsEditingTruck] = useState(false);
+            const [truckFormId, setTruckFormId] = useState(null);
+            const [truckForm, setTruckForm] = useState({
+                name: '', type: 'small', price: '', driverName: '', driverPhone: '', suitability: '', imageUrl: '', status: 'ว่าง'
+            });
+
+            const [toast, setToast] = useState(null);
+            const fileInputRef = useRef(null);
+
+            const showToast = (message, type = 'success') => {
+                setToast({ message, type });
+                setTimeout(() => setToast(null), 4000);
+            };
+
+            // Authentication Lifecycle
+            useEffect(() => {
+                auth.signInAnonymously().catch(err => console.error("Auth error:", err));
+                const unsubscribe = auth.onAuthStateChanged((usr) => {
+                    setUser(usr);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // Real-time Sync ດ້ວຍ Firebase Compat
+            useEffect(() => {
+                if (!user) return;
+                setLoading(true);
+
+                const trucksRef = db.collection(`artifacts/${appId}/public/data/trucks`);
+                const
